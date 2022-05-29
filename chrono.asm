@@ -21,9 +21,12 @@ include     include/bios.inc
 include     include/kernel.inc
 
 
-            ; Convenience definitions
+            ; Hardware addressing definitions
 
-null:       equ   0                      ; sometimes this is more expressive
+;define EXP_PORT 5                       ; If two-level I/O decoding, use
+;define RTC_GROUP 1                      ;  this group select port and value
+
+#define RTC_PORT 5                       ; I/O port for the clock device
 
 
             ; Executable program header
@@ -69,18 +72,29 @@ isoption:   lda   ra                    ; if next character is 'i' then init
 
             ; The -i option initializes the RTC to rational values and
             ; should be done on a new chip or when the battery is replaced.
- 
+
+#ifdef EXP_PORT
+            sex   r3
+            out   EXP_PORT
+            db    RTC_GROUP
+#endif
             ldi   high inittab
             phi   rd
             ldi   low inittab
             plo   rd
+
             sex   rd
 
-initnxt:    out   5
-            out   5
+initnxt:    out   RTC_PORT
+            out   RTC_PORT
             ldn   rd
             lbnz  initnxt
 
+#ifdef EXP_PORT
+            sex   r3
+            out   EXP_PORT
+            db    0
+#endif
             sep   scall
             dw    o_inmsg
             db    'RTC 72421 has been initialized.',13,10,0
@@ -232,9 +246,9 @@ success:    sep   scall                 ; display identity to indicate success
             ; code adjusts the target address to the heap memory block.
 
 patchtbl:   dw    o_getdev, getdev, getdev
-            dw    o_gettod, null, gettod
-            dw    o_settod, null, settod
-            db    null
+            dw    o_gettod, 0, gettod
+            dw    o_settod, 0, settod
+            db    0
 
 
             ; Table of address and value pairs to write to RTC to initialize
@@ -292,10 +306,10 @@ gettod:     ldi   low getnext           ; do common initialization
             br    todinit
 
 getnext:    sex   rd                    ; output tens address, inc pointer
-            out   5
+            out   RTC_PORT
 
             sex   r2                    ; input tens and multiply by 10
-            inp   5
+            inp   RTC_PORT
             ani   0fh
             str   r2
             shl
@@ -305,10 +319,10 @@ getnext:    sex   rd                    ; output tens address, inc pointer
             stxd                        ; decrement for room for next inp
 
             sex   rd                    ; output ones address, inc pointer
-            out   5
+            out   RTC_PORT
 
             sex   r2                    ; input ones and add to tens
-            inp   5
+            inp   RTC_PORT
             ani   0fh
             inc   r2
             add
@@ -347,14 +361,14 @@ settens:    inc   re
             str   r2
 
             sex   rd                    ; output tens address, inc pointer
-            out   5
+            out   RTC_PORT
             sex   r2                    ; output tens value, pop stack
-            out   5
+            out   RTC_PORT
 
             sex   rd                    ; output ones address, inc pointer
-            out   5
+            out   RTC_PORT
             sex   r2                    ; output ones value, pop stack
-            out   5
+            out   RTC_PORT
 
             dec   r2
 
@@ -376,20 +390,25 @@ todinit:    plo   re                    ; save return address
             ghi   rd
             stxd
 
-            sex   r3                    ; set address to register d
-            out   5
+            sex   r3                    ; set address to register rd
+
+#ifdef EXP_PORT
+            out   EXP_PORT
+            db    RTC_GROUP
+#endif
+            out   RTC_PORT
             db    2dh
             br    todhold
 
 todbusy:    sex   r3                    ; clear hold bit
-            out   5
+            out   RTC_PORT
             db    10h
 
-todhold:    out   5                     ; set hold bit
+todhold:    out   RTC_PORT              ; set hold bit
             db    11h
 
             sex   r2                    ; wait until busy bit is clear
-            inp   5
+            inp   RTC_PORT
             ani   02h
             bnz   todbusy
 
@@ -407,10 +426,15 @@ todhold:    out   5                     ; set hold bit
             ; to since it is the end the the prior routines.
 
 todrest:    sex   r3                    ; clear hold bit
-            out   5
+            out   RTC_PORT
             db    2dh
-            out   5
+            out   RTC_PORT
             db    10h
+
+#ifdef EXP_PORT
+            out   EXP_PORT
+            db    0
+#endif
             sex   r2
 
             irx                         ; restore table pointer register

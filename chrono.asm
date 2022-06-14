@@ -257,9 +257,9 @@ patchtbl:   dw    o_getdev, getdev, getdev
             ; values including resetting the time to 01/01/2001 00:00:00.
 
 inittab:    db    2fh,17h
-            db    2ef,10h
-            db    2df,10h
-            db    2cf,10h
+            db    2eh,10h
+            db    2dh,10h
+            db    2ch,10h
             db    2bh,12h
             db    2ah,19h
             db    29h,10h
